@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.wangsen.livetool",
+  "productName": "番白薯直播助手",
+  "asar": true,
+  "directories": {
+    "output": "release/${version}"
+  },
+  "electronLanguages": ["zh-CN", "en-US"],
+  "files": ["dist-electron", "dist"],
+  "mac": {
+    "artifactName": "${productName}_${version}_macos_${arch}.${ext}",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "public/favicon.png"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/favicon.ico",
+    "artifactName": "${productName}_${version}_windows_${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "differentialPackage": true
+  }
+}
