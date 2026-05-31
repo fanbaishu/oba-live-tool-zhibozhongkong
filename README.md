@@ -10,6 +10,11 @@
 
 ## 📸 界面预览
 
+![主界面预览](./screenshot/main_page.png)
+
+![ai](./screenshot/ai_assistant.png)
+
+![自动回复](./screenshot/auto_reply_new.png)
 
 ## ✨ 功能
 
@@ -204,3 +209,7 @@ AI 助手只支持文本对话，在使用 AI 助手功能前，请先设置好�
 ## 📑 许可证
 
 本项目遵循 MIT 许可证
+
+```
+
+```
