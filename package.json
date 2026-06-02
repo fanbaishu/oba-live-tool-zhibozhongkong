@@ -59,7 +59,7 @@
     "@types/semver": "^7.7.0",
     "@types/signale": "^1.4.7",
     "@types/ws": "^8.18.0",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "@welldone-software/why-did-you-render": "10.0.1",
     "ahooks": "^3.8.4",
     "builder-util-runtime": "^9.2.10",
