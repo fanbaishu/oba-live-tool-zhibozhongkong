@@ -10,6 +10,11 @@
 
 ## 📸 界面预览
 
+![主界面预览](./screenshot/main_page.png)
+
+![ai](./screenshot/ai_assistant.png)
+
+![自动回复](./screenshot/auto_reply_new.png)
 
 ## ✨ 功能
 
