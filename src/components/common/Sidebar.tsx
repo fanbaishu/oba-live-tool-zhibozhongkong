@@ -4,6 +4,7 @@ import { useCurrentAutoMessage } from '@/hooks/useAutoMessage'
 import { useCurrentAutoPopUp } from '@/hooks/useAutoPopUp'
 import { useAutoReply } from '@/hooks/useAutoReply'
 import { useCurrentLiveControl } from '@/hooks/useLiveControl'
+import { useUpdateStore } from '@/hooks/useUpdate'
 import { cn } from '@/lib/utils'
 import {
   CarbonBlockStorage,
@@ -21,6 +22,7 @@ interface SidebarTab {
   isRunning?: boolean
   icon: React.ReactNode
   platform?: LiveControlPlatform[]
+  showBadge?: boolean // 🟢 新增：是否显示小红点标记
 }
 
 export default function Sidebar() {
@@ -28,12 +30,20 @@ export default function Sidebar() {
   const isAutoPopupRunning = useCurrentAutoPopUp(context => context.isRunning)
   const { isRunning: isAutoReplyRunning } = useAutoReply()
   const platform = useCurrentLiveControl(context => context.platform)
+  
+  // 🟢 引入是否含有新版本的状态
+  const hasUpdate = useUpdateStore.use.hasUpdate()
 
   const tabs: SidebarTab[] = [
     {
       id: '/',
       name: '打开中控台',
       icon: <CarbonContentDeliveryNetwork className="w-5 h-5" />,
+    },
+    {
+      id: '/data-center',
+      name: '数据中心',
+      icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/></svg>,
     },
     {
       id: '/auto-message',
@@ -66,9 +76,20 @@ export default function Sidebar() {
       icon: <CarbonIbmWatsonTextToSpeech className="w-5 h-5" />,
     },
     {
+      id: '/system-logs',
+      name: '运行日志',
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="4 17 10 11 4 5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+      ),
+    },
+    {
       id: '/settings',
       name: '应用设置',
       icon: <CarbonSettings className="w-5 h-5" />,
+      showBadge: hasUpdate, // 🟢 如果有更新，给设置项打上红点标记
     },
   ]
 
@@ -97,8 +118,16 @@ export default function Sidebar() {
                 )
               }
             >
-              {tab.icon}
+              <div className="relative">
+                {tab.icon}
+                {/* 🟢 渲染红点标记 */}
+                {tab.showBadge && (
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-background animate-pulse" />
+                )}
+              </div>
               {tab.name}
+              
+              {/* 🟢 原有的正在运行绿点标记 */}
               {tab.isRunning && (
                 <span className="absolute right-3 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               )}

@@ -6,13 +6,13 @@ import { createSelectors } from '@/utils/zustand'
 import { useIpcListener } from './useIpc'
 
 export type UpdateStatus =
-  | 'idle' // 空闲
-  | 'checking' // 通过 CDN 简单检查最新版本号
-  | 'available' // 有可用更新 (已获取到信息，等待用户确认)
-  | 'preparing' // 用户点击更新后，正在请求 Electron-Updater 确认链接
-  | 'downloading' // 正在下载
-  | 'ready' // 下载完成，等待重启
-  | 'error' // 发生错误
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'preparing'
+  | 'downloading'
+  | 'ready'
+  | 'error'
 
 export interface VersionState {
   currentVersion: string
@@ -26,6 +26,7 @@ interface UpdateState {
   progress: number
   error: ErrorType | null
   source: string
+  hasUpdate: boolean // 🟢 新增：是否有更新的标识
 }
 
 interface UpdateAction {
@@ -34,6 +35,7 @@ interface UpdateAction {
   installUpdate: () => void
   setProgress: (progress: number) => void
   setStatus: (status: UpdateStatus) => void
+  setHasUpdate: (hasUpdate: boolean) => void // 🟢 新增：修改标识的方法
   reset: () => void
   handleError: (error: ErrorType) => void
   handleUpdate: (info: VersionState) => void
@@ -48,16 +50,17 @@ const useUpdateStoreBase = create<UpdateStore>()((set, get) => ({
   progress: 0,
   error: null,
   source: 'github',
+  hasUpdate: false, // 🟢 默认没有更新
 
   checkUpdateManually: async () => {
     set({ status: 'checking', error: null })
     try {
-      // 这里只获取信息，不触发 electron-updater
       const result = await window.ipcRenderer.invoke(IPC_CHANNELS.updater.checkUpdate)
       if (result) {
-        set({ status: 'available', versionInfo: result })
+        // 🟢 触发更新时，自动标记 hasUpdate 为 true
+        set({ status: 'available', versionInfo: result, hasUpdate: true })
       } else {
-        set({ status: 'idle' })
+        set({ status: 'idle', hasUpdate: false })
         return { upToDate: true }
       }
     } catch (e) {
@@ -74,7 +77,11 @@ const useUpdateStoreBase = create<UpdateStore>()((set, get) => ({
   },
   setStatus: (status: UpdateStatus) => set({ status }),
   setProgress: (progress: number) => set({ progress }),
-  reset: () => set({ status: 'idle', progress: 0, versionInfo: null, error: null }),
+  setHasUpdate: (hasUpdate: boolean) => set({ hasUpdate }), // 🟢 实现方法
+  
+  // 🟢 只重置进度和错误，保留新版本信息和红点标识！
+reset: () => set({ status: 'idle', progress: 0, error: null }),
+  
   handleError: (error: ErrorType) => {
     if (get().status === 'preparing' || get().status === 'downloading') {
       set({ status: 'error', error })
@@ -82,13 +89,15 @@ const useUpdateStoreBase = create<UpdateStore>()((set, get) => ({
   },
   handleUpdate: (info: VersionState) => {
     if (get().status === 'idle') {
-      set({ status: 'available', versionInfo: info })
+      // 🟢 监听到更新时，自动标记 hasUpdate 为 true
+      set({ status: 'available', versionInfo: info, hasUpdate: true })
     }
   },
   setSource: (source: string) => set({ source }),
 }))
 
 export const useUpdateStore = createSelectors(useUpdateStoreBase)
+
 interface UpdateConfigStore {
   enableAutoCheckUpdate: boolean
   source: string

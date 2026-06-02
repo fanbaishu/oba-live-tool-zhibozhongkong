@@ -3,7 +3,7 @@ import { createReadStream, createWriteStream, existsSync, unlinkSync } from 'nod
 import { createRequire } from 'node:module'
 import { arch, platform } from 'node:os'
 import path from 'node:path'
-import { app, net, shell } from 'electron'
+import { app, net, shell, BrowserWindow } from 'electron' // 🟢 新增了 BrowserWindow
 import type { AppUpdater, ProgressInfo, UpdateDownloadedEvent, UpdateInfo } from 'electron-updater'
 import { marked } from 'marked'
 import semver from 'semver'
@@ -104,15 +104,12 @@ let latestVersion: string | null = null
 
 async function getLatestVersion() {
   try {
-    // 从 package.json 获取最新版本号
-    const version = await fetch(
-      new URL(`${GITHUB_OWNER}/${GITHUB_REPO}@main/package.json`, CDN_URL),
-    )
-      .then(resp => resp.json())
-      .then(data => data.version)
-    logger.debug(`从 package.json 获取到的版本为 ${version}`)
-    latestVersion = version
-    return version
+    // 改成直接读取你服务器上的 latest.yml 获取版本号
+    const response = await net.fetch('https://rjgx.fbswlkj.com/latest.yml')
+    const yamlContent = await response.text()
+    const data = yaml.parse(yamlContent) as LatestYml
+    latestVersion = data.version
+    return latestVersion
   } catch (error) {
     logger.error('获取最新版本失败', error)
     return null
@@ -124,9 +121,10 @@ async function fetchChangelog() {
     return releaseNotes[latestVersion]
   }
   try {
-    // 去 CDN 找
-    const changelogURL = new URL(`${GITHUB_OWNER}/${GITHUB_REPO}@main/CHANGELOG.md`, CDN_URL)
+    // 🟢 重点：不要去 GitHub 找了，直接去你的宝塔服务器拉取 CHANGELOG.md
+    const changelogURL = 'https://rjgx.fbswlkj.com/CHANGELOG.md'
     const changelogContent = await fetchWithRetry(changelogURL).then(res => res?.text())
+    
     if (changelogContent) {
       // 找到新版本到当前版本的所有更新日志
       const updateLog = extractChanges(changelogContent, app.getVersion())
@@ -137,14 +135,14 @@ async function fetchChangelog() {
       }
       return releaseNote
     }
-  } catch {
+  } catch (error) {
+    logger.error('获取更新日志失败', error)
     return undefined
   }
 }
 
 function getAssetsURL() {
-  const assetsURL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${latestVersion}/`
-  return assetsURL
+  return 'https://rjgx.fbswlkj.com/' 
 }
 
 interface Updater {
@@ -169,7 +167,7 @@ class UpdateManager {
     if (semver.lt(currentVersion, latestVersion)) {
       // 先用 log 提示更新
       logger.info(
-        `检查到可用更新：${currentVersion} -> ${latestVersion}，可前往应用设置-软件更新处手动更新`,
+        `检查到可用更新：${currentVersion} -> ${latestVersion}，可前往应用设置-软件更新处（刷新后）手动更新`,
       )
       const releaseNote = await fetchChangelog()
 
@@ -265,45 +263,35 @@ class WindowsUpdater implements Updater {
   }
 
   private async checkUpdateForGithub() {
-    // github 不需要关闭 noCache，requestHeaders 默认就是 null
+    // 彻底废弃 GitHub 逻辑，强制指向你的域名
     this.autoUpdater.requestHeaders = null
     this.autoUpdater.setFeedURL({
-      provider: 'github',
-      owner: GITHUB_OWNER,
-      repo: GITHUB_REPO,
+      provider: 'generic',
+      url: 'https://rjgx.fbswlkj.com/', 
     })
     return this.autoUpdater.checkForUpdates()
   }
 
   private async checkUpdateForGhProxy(source: string) {
-    let sourceURL: URL
-    try {
-      sourceURL = new URL(source)
-    } catch {
-      const msg = `更新源设置错误，你的更新源为 ${source}`
-      throw new Error(msg)
-    }
-    const assetsURL = getAssetsURL()
-    // 自定义更新源
+    // 强制使用你自己的域名，无视 source 参数传入的乱七八糟的地址
+    const targetURL = 'https://rjgx.fbswlkj.com/'
+    
     this.autoUpdater.setFeedURL({
       provider: 'generic',
-      url: `${sourceURL}${assetsURL}`,
+      url: targetURL, 
     })
+    
     try {
       return await this.autoUpdater.checkForUpdates()
     } catch (error) {
+      // 保持报错日志，但下载地址强制指定为你服务器上的文件
       const message = `网络错误: ${errorMessage(error).split('\n')[0]}`
-      const downloadURL = `${sourceURL}${assetsURL}${PRODUCT_NAME}_${latestVersion}_windows_x64.exe`
+      const downloadURL = `${targetURL}${PRODUCT_NAME}_${latestVersion}_windows_x64.exe`
       windowManager.send(IPC_CHANNELS.updater.updateError, { message, downloadURL })
     }
   }
 
   public async checkForUpdates(source: string) {
-    // 默认情况会在请求的资源 URL 后面添加查询参数 noCache
-    // 但是很多 proxy 站点并没有针对 query 优化，就会导致 404
-    // 本身通过 proxy 访问的 URL 就带有版本号，所以 noCache 完全没作用
-    // 通过下面的 hack 可以不附带 noCache 查询
-    // https://github.com/electron-userland/electron-builder/issues/3415#issuecomment-433082387
     this.autoUpdater.requestHeaders = { authorization: '' }
     try {
       if (!app.isPackaged) {
@@ -312,9 +300,6 @@ class WindowsUpdater implements Updater {
           windowManager.send(IPC_CHANNELS.updater.updateError, { message })
           return
         }
-        // 开发环境下的更新，要先启动 slow-server (pnpm slow-server)
-        // await this.autoUpdater.checkForUpdates()
-        // return
       }
       logger.debug(`检查更新中…… (更新源: ${source})`)
 
@@ -335,6 +320,17 @@ class WindowsUpdater implements Updater {
   }
 
   public async quitAndInstall() {
+    logger.info('准备强制退出并安装更新')
+    
+    // 🟢 暴力卸载逻辑：移除所有可能阻止软件退出的监听器，并销毁所有活动窗口
+    app.removeAllListeners('window-all-closed')
+    const windows = BrowserWindow.getAllWindows()
+    windows.forEach(win => {
+      win.removeAllListeners('close')
+      win.destroy()
+    })
+
+    // 呼叫更新程序进行覆盖安装
     this.autoUpdater.quitAndInstall(false, true)
   }
 }
@@ -344,12 +340,8 @@ class MacOSUpdater implements Updater {
   private assetsURL: string | null = null
   private savePath: string | null = null
   private safeSource = ''
-  /**
-   * MacOS 如果使用 autoUpdater 需要提供 zip 文件，但是下载了 zip 之后又不能安装，因为没有签名
-   * 所以干脆就手动下载 dmg 文件，下载完毕后退出应用，手动安装
-   */
+  
   public async checkForUpdates(source: string) {
-    // 先从 latest-mac.yml 中获取目标文件
     try {
       const assetsURL = getAssetsURL()
       this.safeSource = source === 'github' ? '' : new URL(source).href
@@ -384,7 +376,6 @@ class MacOSUpdater implements Updater {
         const message = '找不到 dmg 文件'
         throw new Error(message)
       }
-      // 先检查本地是否已经有了这个文件（计算 Sha512）
       this.savePath = path.join(app.getPath('downloads'), 'oba-update-setup.dmg')
       if (existsSync(this.savePath)) {
         const localFileSha512 = await this.calculateFileHash(this.savePath)
@@ -412,7 +403,6 @@ class MacOSUpdater implements Updater {
         const message = '获取文件流失败'
         throw new Error(message)
       }
-      // 删除已存在的文件
       if (existsSync(this.savePath)) {
         unlinkSync(this.savePath)
       }
@@ -448,15 +438,12 @@ class MacOSUpdater implements Updater {
   }
 
   public async quitAndInstall() {
-    // 找到下载文件的路径
     if (!this.savePath) {
       const message = '未指定下载文件路径'
       throw new Error(message)
     }
     if (existsSync(this.savePath)) {
-      // 打开文件
       await shell.openPath(this.savePath)
-      // 等待一会后退出应用
       await sleep(3000)
       app.quit()
     } else {

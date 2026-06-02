@@ -7,6 +7,8 @@ import AutoReplySettings from '@/pages/AutoReply/AutoReplySettings'
 import LiveControl from '@/pages/LiveControl'
 import RedPacket from '@/pages/RedPacket'
 import Settings from '@/pages/SettingsPage'
+import DataCenter from '@/pages/DataCenter' // 🟢 数据大屏
+import SystemLogs from '@/pages/SystemLogs' // 🟢 运行日志
 import App from '../App'
 
 export const router = createHashRouter([
@@ -15,23 +17,31 @@ export const router = createHashRouter([
     element: <App />,
     children: [
       {
-        path: '/',
+        index: true, 
         element: <LiveControl />,
       },
       {
-        path: '/auto-message',
+        path: 'data-center', 
+        element: <DataCenter />,
+      },
+      {
+        path: 'system-logs', // 🟢 运行日志路由已经加在这里了！
+        element: <SystemLogs />,
+      },
+      {
+        path: 'auto-message',
         element: <AutoMessage />,
       },
       {
-        path: '/auto-popup',
+        path: 'auto-popup',
         element: <AutoPopUp />,
       },
       {
-        path: '/settings',
+        path: 'settings',
         element: <Settings />,
       },
       {
-        path: '/ai-chat',
+        path: 'ai-chat',
         element: <AIChat />,
       },
       {
@@ -39,11 +49,11 @@ export const router = createHashRouter([
         element: <AutoReply />,
       },
       {
-        path: '/auto-reply/settings',
+        path: 'auto-reply/settings',
         element: <AutoReplySettings />,
       },
       {
-        path: '/red-packet',
+        path: 'red-packet',
         element: <RedPacket />,
       },
     ],

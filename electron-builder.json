@@ -3,6 +3,14 @@
   "appId": "com.wangsen.livetool",
   "productName": "番白薯直播助手",
   "asar": true,
+  
+  "publish": [
+    {
+      "provider": "generic",
+      "url": "https://rjgx.fbswlkj.com/" 
+    }
+  ],
+
   "directories": {
     "output": "release/${version}"
   },

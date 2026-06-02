@@ -1,8 +1,9 @@
 import { RefreshCwIcon, TerminalIcon } from 'lucide-react'
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { IPC_CHANNELS } from 'shared/ipcChannels'
-import LogDisplayer from '@/components/common/LogDisplayer'
 import Sidebar from '@/components/common/Sidebar'
+import LogDisplayer from '@/components/common/LogDisplayer'
+import { Title } from '@/components/common/Title'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -80,6 +81,7 @@ function useGlobalIpcListener() {
 function App() {
   const { enabled: devMode } = useDevMode()
   const { accounts, currentAccountId } = useAccounts()
+  const location = useLocation() // 🟢 获取当前路由路径
 
   useEffect(() => {
     const account = accounts.find(acc => acc.id === currentAccountId)
@@ -112,14 +114,22 @@ function App() {
               <Sidebar />
 
               {/* 主要内容区域 */}
-              <main className="flex-1 overflow-y-auto p-8">
-                <Outlet />
-              </main>
-            </div>
+              <main className="flex-1 overflow-y-auto p-8 flex flex-col relative">
+                
+                {/* 🟢 1. 常规页面渲染区：如果进了日志页，就把这里隐藏 */}
+                <div style={{ display: location.pathname === '/system-logs' ? 'none' : 'block' }} className="h-full w-full">
+                  <Outlet />
+                </div>
 
-            {/* 下半部分：日志显示器 */}
-            <div className="h-[180px] bg-white border-t shadow-inner">
-              <LogDisplayer />
+                {/* 🟢 2. 24小时开机的全局日志区：平时隐藏，进日志页时瞬间全屏铺满！ */}
+                <div style={{ display: location.pathname === '/system-logs' ? 'flex' : 'none' }} className="flex-col w-full h-full">
+                  <Title title="运行日志" description="实时监控系统的底层运行状态与报错记录" />
+                  <div className="flex-1 w-full h-full mt-4 bg-background rounded-lg shadow-sm border overflow-hidden flex flex-col relative">
+                    <LogDisplayer />
+                  </div>
+                </div>
+
+              </main>
             </div>
           </div>
           <UpdateDialog />
